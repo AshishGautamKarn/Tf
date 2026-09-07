@@ -1,0 +1,11 @@
+# Local Terraform directories
+.terraform/
+
+# State files (contains plain text infrastructure data)
+*.tfstate
+*.tfstate.backup
+
+# Variables files (often contain secret keys/passwords)
+*.tfvars
+*.tfvars.json
+
