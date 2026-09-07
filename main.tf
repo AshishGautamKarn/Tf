@@ -16,7 +16,7 @@ provider "aws" {
 # 3. Define the resource to create
 resource "aws_s3_bucket" "my_practice_bucket" {
   bucket = "terraform-practice-bucket-998877" # Change these numbers!
-  
+
   tags = {
     Environment = "Learning"
   }
