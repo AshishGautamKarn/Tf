@@ -23,7 +23,16 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"] # Note: In production, restrict this to your specific IP!
   }
 
-  # Inbound rule: Allow web traffic
+   # Inbound rule: Allow postgres traffic
+  ingress {
+    description = "Allow PG"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+ # Inbound rule: Allow web traffic
   ingress {
     description = "Allow HTTP"
     from_port   = 80
@@ -52,11 +61,63 @@ resource "aws_instance" "web_server" {
   # Run this bash script when the server first boots up
   user_data = <<-EOF
               #!/bin/bash
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1 
               yum update -y
               yum install -y httpd
               systemctl start httpd
               systemctl enable httpd
               echo "<h1>Hello from Terraform!</h1>" > /var/www/html/index.html
+              # 1. Log all user-data output for troubleshooting
+
+              # 2. Install PostgreSQL 15/16 and contrib modules
+              dnf update -y
+              dnf install -y postgresql15-server postgresql15-contrib
+
+              # 3. Initialize the database cluster
+              PGDATA=/var/lib/pgsql/data
+              postgresql-setup --initdb
+
+              # 4. Apply Advanced PostgreSQL Configurations
+              cat <<EOT >> $PGDATA/postgresql.conf
+              # Connection Settings
+              listen_addresses = '*'
+              max_connections = 300
+
+              # Memory & Execution Plan Tuning (Placeholders to scale based on instance size)
+              shared_buffers = '1GB'             # Scale to ~25% of available RAM
+              effective_cache_size = '3GB'       # Scale to ~75% of available RAM
+              work_mem = '32MB'
+              maintenance_work_mem = '256MB'
+              random_page_cost = 1.1             # Optimized for SSDs/gp3
+
+              # WAL and Replication
+              wal_level = logical                # Prepared for logical decoding/replication
+              max_wal_senders = 10
+              wal_keep_size = '2GB'
+              checkpoint_timeout = '15min'
+              checkpoint_completion_target = 0.9
+
+              # Query Tuning and Observability
+              logging_collector = on
+              log_min_duration_statement = 1000  # Log queries slower than 1s
+              shared_preload_libraries = 'pg_stat_statements'
+
+              # Autovacuum Cost Optimization (Aggressive for high TPS)
+              autovacuum_max_workers = 4
+              autovacuum_vacuum_scale_factor = 0.05
+              autovacuum_analyze_scale_factor = 0.02
+              autovacuum_vacuum_cost_delay = 2ms
+              EOT
+
+              # 5. Secure pg_hba.conf for network access
+              # Enforce scram-sha-256 instead of default ident/trust
+              sed -i 's/ident/scram-sha-256/g' $PGDATA/pg_hba.conf
+              echo "host    all             all             10.0.0.0/16             scram-sha-256" >> $PGDATA/pg_hba.conf
+
+              # 6. Enable and start the service
+              systemctl enable postgresql
+              systemctl start postgresql
+              
               EOF
 
   tags = {
