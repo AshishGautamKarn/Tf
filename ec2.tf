@@ -84,8 +84,8 @@ resource "aws_instance" "web_server" {
               max_connections = 300
 
               # Memory & Execution Plan Tuning (Placeholders to scale based on instance size)
-              shared_buffers = '1GB'             # Scale to ~25% of available RAM
-              effective_cache_size = '3GB'       # Scale to ~75% of available RAM
+              shared_buffers = '256MB'             # Scale to ~25% of available RAM
+              effective_cache_size = '1GB'       # Scale to ~75% of available RAM
               work_mem = '32MB'
               maintenance_work_mem = '256MB'
               random_page_cost = 1.1             # Optimized for SSDs/gp3
@@ -103,7 +103,7 @@ resource "aws_instance" "web_server" {
               shared_preload_libraries = 'pg_stat_statements'
 
               # Autovacuum Cost Optimization (Aggressive for high TPS)
-              autovacuum_max_workers = 4
+              autovacuum_max_workers = 1
               autovacuum_vacuum_scale_factor = 0.05
               autovacuum_analyze_scale_factor = 0.02
               autovacuum_vacuum_cost_delay = 2ms
